@@ -104,3 +104,11 @@ proxy.on('error', (err, req, res) => {
 http.createServer((req, res) => {
   proxy.web(req, res);
 }).listen(8888, () => console.log('Proxy local sur http://localhost:8888'));
+
+http.createServer((req, res) => {
+  console.log('--- Requête reçue du client ---');
+  console.log('Méthode:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  // ... reste du code proxy
+});
