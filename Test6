@@ -24,12 +24,16 @@ tests:
 
 import subprocess
 import json
+import os
+
 
 def call_api(prompt, options, context):
     config = options.get("config", {})
     domain = config.get("domain")
     ip = config.get("ip")
-    cookie = config.get("cookie")
+
+    # Cookie récupéré depuis l'environnement de préférence (sinon fallback config)
+    cookie = os.environ.get("CHATBOT_COOKIE", config.get("cookie", ""))
 
     short_id = context["vars"].get("short_id", "")
     session_id = context["vars"].get("session_id", "")
@@ -56,13 +60,56 @@ def call_api(prompt, options, context):
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        return {"error": result.stderr}
+        return {"error": f"curl a échoué (code {result.returncode}): {result.stderr}"}
+
+    if not result.stdout.strip():
+        return {"error": "Réponse vide de l'API"}
 
     try:
         response_json = json.loads(result.stdout)
     except json.JSONDecodeError:
         return {"error": f"Réponse non-JSON: {result.stdout}"}
 
+    output_parts = []
+
+    bot_messages = response_json.get("params", {}).get("messages", [])
+
+    for msg in bot_messages:
+        if msg.get("from") != "bot":
+            continue
+
+        # Message texte simple
+        text = msg.get("message", {}).get("text")
+        if text:
+            output_parts.append(text)
+
+        # Message avec réponse structurée (choix, etc.)
+        answer = msg.get("answer", {})
+        answer_type = answer.get("type")
+
+        if answer_type == "choice-list-button":
+            choices = answer.get("data", {}).get("choice", [])
+            labels = [c.get("label", "") for c in choices]
+            if labels:
+                output_parts.append("Options proposées: " + ", ".join(labels))
+        elif answer_type:
+            # Type non géré explicitement -> on le signale plutôt que de le perdre
+            output_parts.append(
+                f"[type non géré: {answer_type}] {json.dumps(answer.get('data', {}), ensure_ascii=False)}"
+            )
+
+    # Fallback: si params.messages est vide, on essaie data.messages
+    if not output_parts:
+        data_messages = response_json.get("data", {}).get("messages", [])
+        for msg in data_messages:
+            if msg.get("type") == "text" and msg.get("text"):
+                output_parts.append(msg["text"])
+
+    # Dernier recours: si vraiment rien trouvé, renvoyer le JSON brut pour debug
+    final_output = "\n".join(output_parts) if output_parts else json.dumps(response_json, ensure_ascii=False)
+
     return {
-        "output": response_json  # ⚠️ à adapter — voir ci-dessous
+        "output": final_output
     }
+
+
