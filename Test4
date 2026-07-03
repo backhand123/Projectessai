@@ -1,0 +1,36 @@
+const http = require('http');
+const https = require('https');
+
+const TARGET_DOMAIN = 'XXXc';
+const TARGET_IP = '10.x.x.x';
+
+http.createServer((req, res) => {
+  const headers = { ...req.headers };
+  delete headers.host;
+  headers.host = TARGET_DOMAIN;
+
+  const options = {
+    hostname: TARGET_IP,
+    port: 443,
+    path: req.url,
+    method: req.method,
+    headers: headers,
+    servername: TARGET_DOMAIN,
+    rejectUnauthorized: false,
+  };
+
+  console.log('Headers envoyés au serveur cible:', options.headers);
+
+  const proxyReq = https.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('[PROXY REQUEST ERROR]', err);
+    res.writeHead(502);
+    res.end('Proxy error: ' + err.message);
+  });
+
+  req.pipe(proxyReq);
+}).listen(8888, () => console.log('Proxy local sur http://localhost:8888'));
