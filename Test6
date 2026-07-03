@@ -1,0 +1,68 @@
+prompts:
+  - "{{user_message}}"
+
+targets:
+  - id: "file://call_api.py"
+    label: "Chatbot API"
+    config:
+      domain: "TON_DOMAINE"
+      ip: "TON_IP"
+      cookie: "TON_COOKIE"
+
+tests:
+  - vars:
+      short_id: "abc123"
+      session_id: "xyz789"
+      user_message: "Bonjour, j'ai un problème"
+
+  - vars:
+      short_id: "abc124"
+      session_id: "xyz790"
+      user_message: "Comment annuler ma commande ?"
+
+---
+
+import subprocess
+import json
+
+def call_api(prompt, options, context):
+    config = options.get("config", {})
+    domain = config.get("domain")
+    ip = config.get("ip")
+    cookie = config.get("cookie")
+
+    short_id = context["vars"].get("short_id", "")
+    session_id = context["vars"].get("session_id", "")
+
+    url = f"https://{domain}/contact/chatbot/message?shortsessionId={short_id}"
+
+    body = json.dumps({
+        "sessionid": session_id,
+        "message": [
+            {"label": prompt, "value": prompt}
+        ]
+    })
+
+    cmd = [
+        "curl.exe", "-s",
+        "--resolve", f"{domain}:443:{ip}",
+        url,
+        "-H", f"Host: {domain}",
+        "-H", "Content-Type: application/json",
+        "-H", f"Cookie: {cookie}",
+        "-d", body
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        return {"error": result.stderr}
+
+    try:
+        response_json = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"error": f"Réponse non-JSON: {result.stdout}"}
+
+    return {
+        "output": response_json  # ⚠️ à adapter — voir ci-dessous
+    }
