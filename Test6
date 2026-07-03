@@ -1,15 +1,105 @@
 ---
-if result.returncode != 0:
-        log_content = ""
-        if os.path.exists("curl_debug.log"):
-            with open("curl_debug.log", "r", encoding="utf-8", errors="ignore") as f:
-                log_content = f.read()
-        return {
-            "error": f"curl a échoué (code {result.returncode})\n"
-                     f"STDOUT: {result.stdout}\n"
-                     f"STDERR: {result.stderr}\n"
-                     f"--- LOG COMPLET DE CURL ---\n{log_content}"
-        }
+import subprocess
+import json
+import os
+
+def call_api(prompt, options, context):
+    print("\n[LOG 1] Entrée dans la fonction call_api")
+    
+    # 1. Extraction et nettoyage des variables
+    config = options.get("config", {})
+    domain = config.get("domain", "")
+    ip = config.get("ip", "")
+    cookie = os.environ.get("CHATBOT_COOKIE", config.get("cookie", ""))
+    short_id = context["vars"].get("short_id", "")
+    session_id = context["vars"].get("session_id", "")
+    
+    clean_domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
+    
+    print(f"[LOG 2] Variables récupérées :")
+    print(f"   - Domaine de base : {domain} -> Nettoyé : {clean_domain}")
+    print(f"   - IP cible : {ip}")
+    print(f"   - Short ID : {short_id}")
+    print(f"   - Session ID : {session_id}")
+    print(f"   - Cookie (longueur) : {len(cookie)} caractères")
+
+    # 2. Construction du JSON (body)
+    payload = {
+        "sessionid": session_id,
+        "message": [
+            {"label": prompt, "value": prompt}
+        ]
+    }
+    body = json.dumps(payload)
+    print(f"[LOG 3] JSON généré pour le -d : {body}")
+
+    # 3. Préparation de la commande
+    url = f"https://{clean_domain}/contact/chatbot/message?shortsessionId={short_id}"
+    
+    # Échappement des guillemets du JSON pour la string Windows CMD
+    body_escaped = body.replace('"', '\\"')
+    
+    cmd_str = (
+        f'curl.exe -s -k --resolve "{clean_domain}:443:{ip}" '
+        f'"{url}" '
+        f'-H "Host: {clean_domain}" '
+        f'-H "Content-Type: application/json" '
+        f'-H "Cookie: {cookie}" '
+        f'-d "{body_escaped}"'
+    )
+    print(f"[LOG 4] Commande brute envoyée à Windows :\n{cmd_str}\n")
+
+    # 4. Exécution
+    print("[LOG 5] Lancement de subprocess.run()...")
+    try:
+        result = subprocess.run(cmd_str, capture_output=True, text=True, shell=True)
+        print(f"[LOG 6] Subprocess terminé. Code de retour Windows : {result.returncode}")
+    except Exception as e:
+        print(f"[LOG 6 CRASH] Le subprocess a crashé violemment : {str(e)}")
+        return {"error": f"Crash subprocess: {str(e)}"}
+
+    # 5. Analyse des erreurs systèmes
+    if result.returncode != 0:
+        print(f"[LOG ERREUR] Code {result.returncode} détecté.")
+        print(f"   - STDERR système : {result.stderr}")
+        print(f"   - STDOUT système : {result.stdout}")
+        return {"error": f"Échec système (Code {result.returncode})", "stderr": result.stderr}
+
+    # 6. Analyse du résultat retourné par le serveur
+    print(f"[LOG 7] Réponse brute reçue de l'API (STDOUT) : {result.stdout}")
+    
+    if not result.stdout.strip():
+        print("[LOG ATTENTION] La réponse STDOUT est totalement vide !")
+        return {"error": "Réponse vide de l'API"}
+
+    try:
+        response_json = json.loads(result.stdout)
+        print("[LOG 8] Parsing JSON réussi.")
+    except json.JSONDecodeError:
+        print("[LOG ERREUR] Impossible de parser le retour en JSON.")
+        return {"error": f"Réponse non-JSON: {result.stdout}"}
+
+    # 7. Extraction des messages du bot
+    output_parts = []
+    bot_messages = response_json.get("params", {}).get("messages", [])
+    
+    for msg in bot_messages:
+        if msg.get("from") == "bot":
+            text = msg.get("message", {}).get("text")
+            if text:
+                output_parts.append(text)
+
+    # Fallback si structure différente
+    if not output_parts:
+        data_messages = response_json.get("data", {}).get("messages", [])
+        for msg in data_messages:
+            if msg.get("type") == "text" and msg.get("text"):
+                output_parts.append(msg["text"])
+
+    final_output = "\n".join(output_parts) if output_parts else json.dumps(response_json, ensure_ascii=False)
+    print(f"[LOG 9] Fin du traitement. Texte extrait renvoyé : {final_output}")
+
+    return {"output": final_output}
 -
 prompts:
   - "{{user_message}}"
