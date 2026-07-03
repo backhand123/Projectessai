@@ -1,0 +1,20 @@
+const dns = require('dns');
+const ORIGINAL_LOOKUP = dns.lookup;
+const TARGET_DOMAIN = 'XXX-mon-espace-delentreprisetruc.truc'; // ton vrai domaine
+const TARGET_IP = '10.x.x.x'; // l'IP trouvée à l'étape 1
+
+dns.lookup = function (hostname, options, callback) {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+
+  if (hostname === TARGET_DOMAIN) {
+    if (options && options.all) {
+      return callback(null, [{ address: TARGET_IP, family: 4 }]);
+    }
+    return callback(null, TARGET_IP, 4);
+  }
+
+  return ORIGINAL_LOOKUP.call(dns, hostname, options, callback);
+};
