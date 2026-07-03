@@ -1,36 +1,59 @@
+// local-proxy.js
 const http = require('http');
 const https = require('https');
 
-const TARGET_DOMAIN = 'XXXc';
-const TARGET_IP = '10.x.x.x';
+const TARGET_DOMAIN = 'XXX'; // <-- remplace par ton vrai domaine
+const TARGET_IP = '10.x.x.x'; // <-- remplace par la vraie IP interne
 
 http.createServer((req, res) => {
-  const headers = { ...req.headers };
-  delete headers.host;
-  headers.host = TARGET_DOMAIN;
+  let bodyChunks = [];
 
-  const options = {
-    hostname: TARGET_IP,
-    port: 443,
-    path: req.url,
-    method: req.method,
-    headers: headers,
-    servername: TARGET_DOMAIN,
-    rejectUnauthorized: false,
-  };
+  req.on('data', chunk => bodyChunks.push(chunk));
 
-  console.log('Headers envoyés au serveur cible:', options.headers);
+  req.on('end', () => {
+    const body = Buffer.concat(bodyChunks);
 
-  const proxyReq = https.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    const headers = { ...req.headers };
+    delete headers.host;
+    headers.host = TARGET_DOMAIN;
+    headers['content-length'] = Buffer.byteLength(body);
+
+    console.log('--- Requête sortante vers le serveur cible ---');
+    console.log('Method:', req.method);
+    console.log('Path:', req.url);
+    console.log('Headers:', headers);
+    console.log('Body:', body.toString());
+    console.log('Content-Length calculé:', Buffer.byteLength(body));
+
+    const options = {
+      hostname: TARGET_IP,
+      port: 443,
+      path: req.url,
+      method: req.method,
+      headers: headers,
+      servername: TARGET_DOMAIN,
+      rejectUnauthorized: false,
+    };
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      console.log('--- Réponse du serveur cible ---');
+      console.log('Status:', proxyRes.statusCode);
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('[PROXY REQUEST ERROR]', err);
+      res.writeHead(502);
+      res.end('Proxy error: ' + err.message);
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
   });
 
-  proxyReq.on('error', (err) => {
-    console.error('[PROXY REQUEST ERROR]', err);
-    res.writeHead(502);
-    res.end('Proxy error: ' + err.message);
+  req.on('error', (err) => {
+    console.error('[CLIENT REQUEST ERROR]', err);
   });
 
-  req.pipe(proxyReq);
-}).listen(8888, () => console.log('Proxy local sur http://localhost:8888'));
+}).listen(8888, () => console.log('Proxy local actif sur http://localhost:8888'));
