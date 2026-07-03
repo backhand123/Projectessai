@@ -113,3 +113,28 @@ def call_api(prompt, options, context):
     }
 
 
+--
+from call_api import call_api
+
+# Simule ce que promptfoo enverrait normalement
+prompt = "Bonjour, j'ai un problème"
+
+options = {
+    "config": {
+        "domain": "TON_DOMAINE",
+        "ip": "TON_IP",
+        "cookie": "TON_COOKIE"   # ou laisse vide si tu utilises CHATBOT_COOKIE en env
+    }
+}
+
+context = {
+    "vars": {
+        "short_id": "abc123",
+        "session_id": "xyz789"
+    }
+}
+
+result = call_api(prompt, options, context)
+print(result)
+
+
