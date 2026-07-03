@@ -23,3 +23,22 @@ dns.lookup = function (hostname, options, callback) {
 require('dns').lookup('XXX-mon-espace-delentreprisetruc.truc', (err, address) => {
   console.log(err, address);
 });
+
+
+const { setGlobalDispatcher, Agent } = require('undici');
+const dns = require('dns');
+
+const TARGET_DOMAIN = 'XXX-mon-espace-delentreprisetruc.truc';
+const TARGET_IP = '10.x.x.x';
+
+setGlobalDispatcher(new Agent({
+  connect: {
+    lookup: (hostname, options, callback) => {
+      console.error(`[UNDICI LOOKUP] ${hostname}`); // pour vérifier que ça passe bien par là
+      if (hostname === TARGET_DOMAIN) {
+        return callback(null, [{ address: TARGET_IP, family: 4 }]);
+      }
+      dns.lookup(hostname, options, callback);
+    }
+  }
+}));
