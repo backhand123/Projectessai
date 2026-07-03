@@ -1,3 +1,16 @@
+---
+if result.returncode != 0:
+        log_content = ""
+        if os.path.exists("curl_debug.log"):
+            with open("curl_debug.log", "r", encoding="utf-8", errors="ignore") as f:
+                log_content = f.read()
+        return {
+            "error": f"curl a échoué (code {result.returncode})\n"
+                     f"STDOUT: {result.stdout}\n"
+                     f"STDERR: {result.stderr}\n"
+                     f"--- LOG COMPLET DE CURL ---\n{log_content}"
+        }
+-
 prompts:
   - "{{user_message}}"
 
