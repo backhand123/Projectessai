@@ -42,3 +42,31 @@ setGlobalDispatcher(new Agent({
     }
   }
 }));
+
+
+// local-proxy.js
+const http = require('http');
+const httpProxy = require('http-proxy'); // npm install http-proxy
+
+const TARGET_DOMAIN = 'XXX-';
+const TARGET_IP = '10.x.x.x';
+
+const proxy = httpProxy.createProxyServer({
+  target: `https://${TARGET_IP}`,
+  changeOrigin: false,
+  secure: false, // si certificat interne non reconnu
+  headers: { Host: TARGET_DOMAIN }
+});
+
+http.createServer((req, res) => {
+  proxy.web(req, res);
+}).listen(8888, () => console.log('Proxy local sur http://localhost:8888'));
+
+
+npm install http-proxy
+node local-proxy.js
+
+providers:
+  - id: http
+    config:
+      url: 'http://localhost:8888/contact/chatbot/message?shortsessionId={{auth_short_id}}'
