@@ -18,3 +18,8 @@ dns.lookup = function (hostname, options, callback) {
 
   return ORIGINAL_LOOKUP.call(dns, hostname, options, callback);
 };
+
+
+require('dns').lookup('XXX-mon-espace-delentreprisetruc.truc', (err, address) => {
+  console.log(err, address);
+});
