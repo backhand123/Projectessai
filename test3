@@ -1,6 +1,6 @@
 const dns = require('dns');
 const ORIGINAL_LOOKUP = dns.lookup;
-const TARGET_DOMAIN = 'XXX-mon-espace-delentreprisetruc.truc'; // ton vrai domaine
+const TARGET_DOMAIN = 'XXX'; // ton vrai domaine
 const TARGET_IP = '10.x.x.x'; // l'IP trouvée à l'étape 1
 
 dns.lookup = function (hostname, options, callback) {
@@ -20,7 +20,7 @@ dns.lookup = function (hostname, options, callback) {
 };
 
 
-require('dns').lookup('XXX-mon-espace-delentreprisetruc.truc', (err, address) => {
+require('dns').lookup('XXX', (err, address) => {
   console.log(err, address);
 });
 
@@ -28,7 +28,7 @@ require('dns').lookup('XXX-mon-espace-delentreprisetruc.truc', (err, address) =>
 const { setGlobalDispatcher, Agent } = require('undici');
 const dns = require('dns');
 
-const TARGET_DOMAIN = 'XXX-mon-espace-delentreprisetruc.truc';
+const TARGET_DOMAIN = 'XXX';
 const TARGET_IP = '10.x.x.x';
 
 setGlobalDispatcher(new Agent({
