@@ -70,3 +70,37 @@ providers:
   - id: http
     config:
       url: 'http://localhost:8888/contact/chatbot/message?shortsessionId={{auth_short_id}}'
+
+
+const http = require('http');
+const httpProxy = require('http-proxy');
+
+const TARGET_DOMAIN = 'XXX-mon-espace-delentreprisetruc.truc';
+const TARGET_IP = '10.x.x.x';
+
+const proxy = httpProxy.createProxyServer({
+  target: {
+    protocol: 'https:',
+    host: TARGET_IP,
+    port: 443,
+  },
+  changeOrigin: true,   // important : réécrit le Host automatiquement, cf. plus bas
+  secure: false,         // ignore les erreurs de certificat (cert interne non reconnu publiquement)
+  ssl: {
+    servername: TARGET_DOMAIN, // force le bon SNI, sinon le serveur peut rejeter la connexion
+  }
+});
+
+proxy.on('proxyReq', (proxyReq) => {
+  proxyReq.setHeader('Host', TARGET_DOMAIN); // au cas où changeOrigin ne suffise pas
+});
+
+proxy.on('error', (err, req, res) => {
+  console.error('[PROXY ERROR]', err);
+  res.writeHead(502);
+  res.end('Proxy error: ' + err.message);
+});
+
+http.createServer((req, res) => {
+  proxy.web(req, res);
+}).listen(8888, () => console.log('Proxy local sur http://localhost:8888'));
